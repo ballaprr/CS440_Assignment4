@@ -50,9 +50,11 @@ private:
 
         }
 
-        bitset<2> binary_number = bitset<2>(id % 256);
+        bitset<i> binary_number = bitset<i>(record.id % 256);
 
-
+        if (n <= binary_number.to_ullong()) {
+            binary_number.flip(i-1);
+        }
         // Add record to the index in the correct block, creating a overflow block if necessary
 
 
@@ -78,7 +80,14 @@ public:
     // 
     // Read csv file and add records to the index
     void createFromFile(string csvFName) {
+        ifstream file(csvFName);
 
+        string line;
+        while (getline(file, line)) {
+            vector<string> cols;
+            istringstream iss(line);
+            
+        }
         
     }
 
