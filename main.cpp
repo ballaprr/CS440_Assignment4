@@ -23,6 +23,9 @@ int main(int argc, char* const argv[]) {
     emp_index.createFromFile("Employee.csv");
     
     // Loop to lookup IDs until user is ready to quit
+    while () {
+        
+    }
     
 
     return 0;
