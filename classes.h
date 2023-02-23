@@ -75,6 +75,15 @@ public:
 
         // Create your EmployeeIndex file and write out the initial 4 buckets
         // make sure to account for the created buckets by incrementing nextFreeBlock appropriately
+
+        n = nextFreeBlock + n;
+        ofstream outputFile(indexFileName, ios::binary);
+        for (int j = 0; j < n; j++) {
+            char block[BLOCK_SIZE] = {0};
+            outputFile.write(block, BLOCK_SIZE);
+            nextFreeBlock += BLOCK_SIZE;
+        }
+        outputFile.close();
       
     }
 
