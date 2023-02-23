@@ -47,6 +47,7 @@ private:
         // No records written to index yet
         if (numRecords == 0) {
             // Initialize index with first blocks (start with 4)
+            n = 4;
 
         }
 
@@ -77,17 +78,26 @@ public:
       
     }
 
-    // 
+    // https://www.youtube.com/watch?v=NFvxA-57LLA&t=626s
     // Read csv file and add records to the index
     void createFromFile(string csvFName) {
-        ifstream file(csvFName);
+        ifstream inputFile;
+        inputFile.open(csvFName);
 
-        string line;
-        while (getline(file, line)) {
+        string line = "";
+        Record record;
+        while (getline(inputFile, line)) {
             vector<string> cols;
-            istringstream iss(line);
-            
+            stringstream inputString(line);
+            string col;
+            while(getline(inputString, col, ',')) {
+                cols.push_back(col);
+            }
+            record = Record(cols);
+            insertRecord(record);
+
         }
+        file.close();
         
     }
 
