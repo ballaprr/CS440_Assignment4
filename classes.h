@@ -56,8 +56,14 @@ private:
         if (n <= binary_number.to_ullong()) {
             binary_number.flip(i-1);
         }
+        int j = binary_number.to_ullong();
+        int offset = j * BLOCK_SIZE;
         // Add record to the index in the correct block, creating a overflow block if necessary
-
+        char block[BLOCK_SIZE];
+        ifstream inputFile(fName, ios::binary);
+        inputFile.seekg(offset);
+        inputFile.read(block, BLOCK_SIZE);
+        inputFile.close();
 
         // Take neccessary steps if capacity is reached:
 		// increase n; increase i (if necessary); place records in the new bucket that may have been originally misplaced due to a bit flip
