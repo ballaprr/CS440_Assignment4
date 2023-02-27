@@ -16,14 +16,25 @@ using namespace std;
 
 
 int main(int argc, char* const argv[]) {
-    cout << "This programme actually starts at literally any point.";
-
     // Create the index
     LinearHashIndex emp_index("EmployeeIndex");
     emp_index.createFromFile("Employee.csv");
     
     // Loop to lookup IDs until user is ready to quit
-    
+    std::string user_input;
+    while (1) {
+        cout << "Enter ID to look up (or <exit> to exit):" << endl;
+        cin >> user_input;
+        std::cin.clear();
+        if (user_input.compare("exit") == 0) {
+            break;
+        }
+        else {
+            int id = stoi(user_input);
+            Record recFound = emp_index.findRecordById(id);
+            recFound.print();
+        }
+    }
 
     return 0;
 }
