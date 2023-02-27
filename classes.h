@@ -6,60 +6,7 @@
 #include <bitset>
 using namespace std;
 
-class Block {
-private:
-    const int BLOCK_SIZE = 4096;
 
-public:
-    int nextBuffer = 0;     // The first buffer will never be an overflow buffer, and this allows an "if (nextBuffer)" check.
-    int numRecords = 0;
-    vector<Record> records;
-
-    // Given the filestream and block #, get a given block.
-    // Should be possible to reuse the same Block object to fetch a new block.
-    void fetchFromFile(fstream& blockDir, int blockAddr) {
-        string temp_block;
-        blockDir.seekg(blockAddr)
-        blockDir.read(temp_block, BLOCK_SIZE);
-
-        std::string numRecordsStr(temp_block, BLOCK_SIZE - 16, 8);
-        numRecords = stoi(numRecordsStr);
-        for (i = 0; i < numRecords; i++) {
-            int record_offset = i * 716;
-            vector<std::string> fields;
-
-            std::string eid(temp_block, record_offset, 8);
-            fields.push_back(eid);
-            std::string ename(temp_block, record_offset, 200);
-            fields.push_back(ename);
-            std::string ebio(temp_block, record_offset, 500);
-            fields.push_back(ebio);
-            std::string emid(temp_block, record_offset, 8);
-            fields.push_back(emid);
-
-            Record(fields) emp;
-            records[i] = emp;
-        }
-
-        std::string nextBufferStr(temp_block, BLOCK_SIZE - 8, 8);
-        nextBuffer = stoi(nextBufferStr);
-    }
-
-    void clear() {
-        records.clear();
-        nextBuffer = 0;
-    }
-
-    // Given the filestream and current block, fetch an overflow block.
-    void fetchNext(fstream& blockDir) {
-        if (nextBuffer) {
-            fetchFromFile(blockDir, nextBuffer);
-        }
-        else {
-            cout << "ERR: Attempted to fetch next file without nextBuffer set!"
-        }
-    }
-};
 
 class Record {
 public:
@@ -81,6 +28,112 @@ public:
     }
 };
 
+class Block {
+private:
+    const int BLOCK_SIZE = 4096;
+
+public:
+    int nextBuffer = 0;     // The first buffer will never be an overflow buffer, and this allows an "if (nextBuffer)" check.
+    int numRecords = 0;
+    vector<Record> records;
+
+    // Given the filestream and block address, move to and get a given block.
+    void fetchFromFile(fstream& indFile, int blockAddr) {
+        string temp_block;
+        indFile.seekg(blockAddr)
+        indFile.read(temp_block, BLOCK_SIZE);
+
+        std::string numRecordsStr(temp_block, BLOCK_SIZE - 16, 8);
+        numRecords = stoi(numRecordsStr);
+        for (i = 0; i < numRecords; i++) {
+            int record_offset = i * 716;
+            vector<std::string> fields;
+
+            std::string eid(temp_block, record_offset, 8);
+            fields.push_back(eid);
+            std::string ename(temp_block, record_offset, 200);
+            fields.push_back(ename);
+            std::string ebio(temp_block, record_offset, 500);
+            fields.push_back(ebio);
+            std::string emid(temp_block, record_offset, 8);
+            fields.push_back(emid);
+
+            Record emp(fields);
+            records[i] = emp;
+        }
+
+        std::string nextBufferStr(temp_block, BLOCK_SIZE - 8, 8);
+        nextBuffer = stoi(nextBufferStr);
+    }
+
+    void insertRecord(Record record) {
+        records[numRecords] = record;
+        numRecords++;
+    }
+
+    void clear() {
+        records.clear();
+        numRecords = 0;
+        nextBuffer = 0;
+    }
+
+    // Given the filestream and current block, fetch an overflow block.
+    void fetchNext(fstream& indFile) {
+        if (nextBuffer) {
+            fetchFromFile(indFile, nextBuffer);
+        }
+        else {
+            cout << "ERR: Attempted to fetch next file without nextBuffer set!"
+        }
+    }
+
+    // Format the current info as a char array of size BLOCK_SIZE and write to
+    // the passed position in the file.
+    void writeBlock(fstream& indFile) {
+        // Initialise variables
+        char writeBuffer[BLOCK_SIZE];
+        int i;
+
+        // Copy all records into the string
+        for (i = 0; i < numRecords; i++) {
+            int j;
+
+            // Copy employee id
+            char* temp = itoa(records[i].id);
+            for (j = 0; j < 8 - strlen(temp); j++) {
+                writeBuffer[i * BLOCK_SIZE + j] = '0';
+            }
+            strncpy(&writeBuffer[i * BLOCK_SIZE + j], temp, strlen(temp));
+            
+            // Copy employee name
+            strncpy(&writeBuffer[i * BLOCK_SIZE + 8], records[i].name, 200);
+
+            // Copy employee bio
+            strncpy(&writeBuffer[i * BLOCK_SIZE + 208], records[i].bio, 500);
+
+            // Copy manager id
+            char* temp = itoa(records[i].manager_id);
+            for (j = 0; j < 8 - strlen(temp); j++) {
+                writeBuffer[i * BLOCK_SIZE + j] = '0';
+            }
+            strncpy(&writeBuffer[i * BLOCK_SIZE + 708 + j], temp, strlen(temp));
+        }
+
+        char* temp = itoa(numRecords);
+        for (i = 0; i < 8 - strlen(temp); i++) {
+            writeBuffer[BLOCK_SIZE - 16 + i] = '0';
+        }
+        strncpy(&writeBuffer[BLOCK_SIZE - 16 + i], temp, strlen(temp));
+
+        temp = itoa(nextBuffer);
+        for (i = 0; i < 8 - strlen(temp); i++) {
+            writeBuffer[BLOCK_SIZE - 8 + i] = '0';
+        }
+        strncpy(&writeBuffer[BLOCK_SIZE - 8 + i], temp, strlen(temp));
+
+        indFile.write(writeBuffer, BLOCK_SIZE);
+    }
+};
 
 class LinearHashIndex {
 
@@ -110,24 +163,52 @@ private:
             for (int iter = 0; iter < 4; iter++) {
                 blockDirectory[iter] = nextFreeBlock;
                 nextFreeBlock += BLOCK_SIZE;
+
+                // Place an empty block in the designated spot.
+                Block emptyBlock;
+                indexFile.seekg(blockDirectory[iter]);
+                emptyBlock.writeBlock(fstream &indexFile);
             }
         }
 
         // Add record to the index in the correct block, creating an overflow block if necessary
+
+        // Get bits relevant to block address
         int hash = record.id % 256;
         int sigbits = hash % pow(2, i);
         // Bitflip if necessary.
         if (sigbits >= n) {
             sigbits = sigbits % pow(2, i - 1);
         }
-        int targetBlock = blockDirectory[sigbits];
-        indexFile.seekg(targetBlock);
-        while indexFile[BLOCK_SIZE - 9] == '5'
+        int targetBlockAddr = blockDirectory[sigbits];
+        Block tempBlock;
+        tempBlock.fetchFromFile(indexFile, targetBlockAddr);
+        // Get a block with at least one free space
+        while (tempBlock.numRecords == 5) {
+            if (tempBlock.nextBuffer) {
+                tempBlock.fetchNext;
+            }
+            else {
+                // Set the current block's nextBuffer to nextFreeBlock.
+                tempBlock.nextBuffer = nextFreeBlock;
+                tempBlock.writeBlock(fstream &indexFile);
+
+                // Go to the next block and increment nextFreeBlock.
+                indexFile.seekg(nextFreeBlock);
+                nextFreeBlock += BLOCK_SIZE;
+
+                // Clear tempBlock's data.
+                tempBlock.clear();
+            }
+        }
+
+        tempBlock.insertRecord(record);
 
         // Take neccessary steps if capacity is reached:
 		// increase n; increase i (if necessary); place records in the new bucket that may have been originally misplaced due to a bit flip
-        if (++numRecords >= )
-
+        if (++numRecords >= 0.7 * 5 * n) {
+            ; // HERE is where I'm currently working.
+        }
     }
 
 public:
